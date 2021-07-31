@@ -3,6 +3,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -20,57 +21,78 @@ import java.util.concurrent.ExecutorService
 typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
+    var camera:Camera?=null
+    var preview:Preview?=null
     private var imageCapture: ImageCapture? = null
-
     private lateinit var outputDirectory: File
+
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Request camera permissions
-        if (allPermissionsGranted()) {
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PERMISSION_GRANTED){
             startCamera()
-        } else {
-            ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+
+        }
+        else
+        {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA),0)
+
+        }
+        camera_capture_button.setOnClickListener {
+            takePhoto()
+
         }
 
-        // Set up the listener for take photo button
-        camera_capture_button.setOnClickListener { takePhoto() }
-
-        outputDirectory = getOutputDirectory()
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
-    private fun takePhoto() {}
+    private fun takePhoto() {
+        //save photo
+        outputDirectory=File(externalMediaDirs.get(0),"kaagazScanner-${System.currentTimeMillis()}.jpg")
+        val output=ImageCapture.OutputFileOptions.Builder(outputDirectory).build()
+        imageCapture?.takePicture(output,ContextCompat.getMainExecutor(this),object :ImageCapture.OnImageSavedCallback{
+            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+               Toast.makeText(applicationContext,"Image Saved",Toast.LENGTH_SHORT).show()
+            }
 
-    private fun startCamera() {}
+            override fun onError(exception: ImageCaptureException) {
+                TODO("Not yet implemented")
+            }
 
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(
-            baseContext, it) == PackageManager.PERMISSION_GRANTED
+        })
+
+
     }
 
-    private fun getOutputDirectory(): File {
-        val mediaDir = externalMediaDirs.firstOrNull()?.let {
-            File(it, resources.getString(R.string.app_name)).apply { mkdirs() } }
-        return if (mediaDir != null && mediaDir.exists())
-            mediaDir else filesDir
+    override fun onRequestPermissionsResult(requestCode: Int,
+                                            permissions: Array<out String>,
+                                            grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PERMISSION_GRANTED){
+
+startCamera()
+        }
+        else
+        {
+           Toast.makeText(this,"please accept the permission",Toast.LENGTH_SHORT).show()
+
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraExecutor.shutdown()
+    private fun startCamera() {
+       val cameraProviderFuture=ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener(Runnable {
+                val cameraProvider=cameraProviderFuture.get()
+            preview=Preview.Builder().build()
+          preview?.setSurfaceProvider(viewFinder.createSurfaceProvider(camera?.cameraInfo))
+imageCapture=ImageCapture.Builder().build()
+ val cameraSelector=CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+            cameraProvider.unbindAll()
+            camera=cameraProvider.bindToLifecycle(this,cameraSelector,preview,imageCapture)
+        },ContextCompat.getMainExecutor(this))
+
     }
 
-    companion object {
-        private const val TAG = "CameraXBasic"
-        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
-    }
 
 }
