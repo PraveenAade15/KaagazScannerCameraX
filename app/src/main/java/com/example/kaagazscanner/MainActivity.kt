@@ -21,8 +21,8 @@ import java.util.concurrent.ExecutorService
 typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
-    var camera:Camera?=null
-    var preview:Preview?=null
+   private var camera:Camera?=null
+    private var preview:Preview?=null
     private var imageCapture: ImageCapture? = null
     private lateinit var outputDirectory: File
 
@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onError(exception: ImageCaptureException) {
-                TODO("Not yet implemented")
+
             }
 
         })
